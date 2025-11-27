@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import AdminDashboard from "./pages/AdminDashboard";
 import LocalAdminDashboard from "./pages/LocalAdminDashboard";
 import WorkerDashboard from "./pages/WorkerDashboard";
+import CitizenDashboard from "./pages/CitizenDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,14 @@ const App = () => (
             element={
               <ProtectedRoute allowedRoles={['worker']}>
                 <WorkerDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/citizen" 
+            element={
+              <ProtectedRoute allowedRoles={['citizen']}>
+                <CitizenDashboard />
               </ProtectedRoute>
             } 
           />

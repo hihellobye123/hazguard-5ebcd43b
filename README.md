@@ -1,73 +1,193 @@
-# Welcome to your Lovable project
+# 🛡️ HazGuard - Disaster Relief Management System
 
-## Project info
+<div align="center">
 
-**URL**: https://lovable.dev/projects/f513fbd3-0500-40e3-a924-13e6899f45a1
+![HazGuard](https://img.shields.io/badge/HazGuard-Disaster%20Relief-blue?style=for-the-badge)
+![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=for-the-badge&logo=tailwind-css)
 
-## How can I edit this code?
+**A comprehensive disaster relief coordination platform for West Bengal**
 
-There are several ways of editing your application.
+[Live Demo](#demo) • [Features](#features) • [Installation](#installation) • [Usage](#usage)
 
-**Use Lovable**
+</div>
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f513fbd3-0500-40e3-a924-13e6899f45a1) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## 📖 Overview
 
-**Use your preferred IDE**
+HazGuard is a modern web application designed to streamline disaster relief operations in West Bengal, India. It connects administrators, local coordinators, relief workers, and citizens through an intuitive interface, enabling efficient resource allocation and real-time tracking during emergencies.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## ✨ Features
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 🔐 Multi-Role Authentication
+- **Main Admin**: Full system access, disaster monitoring, allotment approvals
+- **Local Admin**: Worker coordination, allotment management
+- **Relief Workers**: Task notifications, assignment tracking
+- **Citizens**: Real-time worker tracking, emergency contact
 
-Follow these steps:
+### 📊 Real-Time Disaster Monitoring
+- Live disaster feed for West Bengal region
+- Auto-refresh every 5 minutes
+- Severity-based categorization (Severe, Moderate, Low)
+- Quick response allocation system
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 👥 Worker Allotment System
+- Multi-worker assignment capability
+- Product/supply itemization with pricing
+- Pickup and destination location management
+- Cost calculation and approval workflow
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 📍 Citizen Tracking Portal
+- View relief workers within 10km radius
+- Real-time distance calculation
+- Direct call/message functionality
+- Location-based filtering
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 🎨 Modern UI/UX
+- Liquid glass (glassmorphism) design
+- Dark theme with beautiful gradients
+- Responsive mobile-first layout
+- Smooth animations and transitions
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/hazguard.git
+
+# Navigate to project directory
+cd hazguard
+
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Build for Production
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm run build
+```
 
-**Use GitHub Codespaces**
+## 🔑 Demo Credentials
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+| Role | Username | Password |
+|------|----------|----------|
+| Main Admin | `admin` | `admin` |
+| Local Admin | `localadmin` | `localadmin` |
+| Worker | `Amit Das` | `9876543210` |
+| Citizen | Any name | Any phone |
 
-## What technologies are used for this project?
+## 📱 User Workflows
 
-This project is built with:
+### Admin Workflow
+1. Login with admin credentials
+2. View live disasters on dashboard
+3. Click "Allot Help" on disaster card
+4. Select workers, locations, and products
+5. Submit for allotment
+6. Review and approve/reject pending allotments
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Local Admin Workflow
+1. Login with local admin credentials
+2. View allotments assigned by main admin
+3. Confirm and submit to main admin for final approval
+4. Track approved allotments
 
-## How can I deploy this project?
+### Worker Workflow
+1. Login with name and phone number
+2. Receive notification cards for new assignments
+3. View task details (pickup, destination, products)
+4. Contact team members if needed
 
-Simply open [Lovable](https://lovable.dev/projects/f513fbd3-0500-40e3-a924-13e6899f45a1) and click on Share -> Publish.
+### Citizen Workflow
+1. Login via citizen portal with name/phone
+2. Select your location
+3. View nearby relief workers (10km radius)
+4. Call or message workers directly
 
-## Can I connect a custom domain to my Lovable project?
+## 🏗️ Tech Stack
 
-Yes, you can!
+- **Frontend**: React 18 + TypeScript
+- **Styling**: Tailwind CSS + Custom Design System
+- **State Management**: Zustand (with persistence)
+- **Routing**: React Router v6
+- **Data Fetching**: TanStack Query
+- **Icons**: Lucide React
+- **Notifications**: Sonner Toast
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 📂 Project Structure
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```
+src/
+├── components/          # Reusable UI components
+│   ├── ui/             # Shadcn UI components
+│   ├── AllotmentModal.tsx
+│   ├── DisasterCard.tsx
+│   └── Navbar.tsx
+├── data/
+│   └── workers.ts      # Worker database (50 Bengali workers)
+├── hooks/
+│   └── useDisasters.ts # Disaster data fetching hook
+├── pages/
+│   ├── AdminDashboard.tsx
+│   ├── LocalAdminDashboard.tsx
+│   ├── WorkerDashboard.tsx
+│   ├── CitizenDashboard.tsx
+│   ├── Login.tsx
+│   └── Index.tsx
+├── store/
+│   └── authStore.ts    # Global state with Zustand
+└── index.css           # Design system tokens
+```
+
+## 🎨 Design System
+
+The application uses a custom design system with:
+
+- **Primary Color**: Blue (#3b82f6)
+- **Success**: Green (#10b981)
+- **Warning**: Amber (#f59e0b)
+- **Destructive**: Red (#ef4444)
+- **Glass Effects**: Backdrop blur with transparency
+- **Animations**: Fade-in, float, pulse-glow
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Lovable](https://lovable.dev)
+- UI components from [shadcn/ui](https://ui.shadcn.com)
+- Icons from [Lucide](https://lucide.dev)
+
+---
+
+<div align="center">
+
+**Made with ❤️ for West Bengal Disaster Relief**
+
+[Report Bug](https://github.com/yourusername/hazguard/issues) • [Request Feature](https://github.com/yourusername/hazguard/issues)
+
+</div>
