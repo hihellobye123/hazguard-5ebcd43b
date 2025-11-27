@@ -19,6 +19,9 @@ const Index = () => {
         case 'worker':
           navigate('/worker');
           break;
+        case 'citizen':
+          navigate('/citizen');
+          break;
       }
     }
   }, [user, navigate]);
