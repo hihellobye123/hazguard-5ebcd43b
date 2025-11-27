@@ -1,15 +1,35 @@
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/store/authStore";
-import { Package, MapPin, Clock, CheckCircle } from "lucide-react";
+import { Package, MapPin, Clock, CheckCircle, Bell, X } from "lucide-react";
 
 const WorkerDashboard = () => {
   const { user, allotments } = useAuthStore();
+  const [viewedAllotments, setViewedAllotments] = useState<string[]>(() => {
+    const stored = localStorage.getItem(`viewed_${user?.phone}`);
+    return stored ? JSON.parse(stored) : [];
+  });
 
   // Get allotments assigned to this worker
   const myAllotments = allotments.filter(a => 
     a.workers.some(w => w.name.toLowerCase() === user?.name.toLowerCase()) &&
     a.status === 'approved'
   );
+
+  // New notifications (not yet viewed)
+  const newNotifications = myAllotments.filter(a => !viewedAllotments.includes(a.id));
+
+  const dismissNotification = (id: string) => {
+    const updated = [...viewedAllotments, id];
+    setViewedAllotments(updated);
+    localStorage.setItem(`viewed_${user?.phone}`, JSON.stringify(updated));
+  };
+
+  const dismissAll = () => {
+    const allIds = myAllotments.map(a => a.id);
+    setViewedAllotments(allIds);
+    localStorage.setItem(`viewed_${user?.phone}`, JSON.stringify(allIds));
+  };
 
   return (
     <div className="min-h-screen pb-20">
@@ -20,6 +40,78 @@ const WorkerDashboard = () => {
           <h2 className="text-3xl font-bold text-primary mb-2">Welcome, {user?.name}!</h2>
           <p className="text-muted-foreground">Phone: {user?.phone}</p>
         </div>
+
+        {/* New Assignment Notifications */}
+        {newNotifications.length > 0 && (
+          <div className="mb-6 animate-fade-in">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Bell className="text-warning animate-pulse" size={20} />
+                New Assignments ({newNotifications.length})
+              </h3>
+              <button 
+                onClick={dismissAll}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Mark all as read
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {newNotifications.map((allotment) => (
+                <div 
+                  key={allotment.id} 
+                  className="relative glass-card p-5 border-2 border-warning/50 animate-pulse-glow"
+                >
+                  <button 
+                    onClick={() => dismissNotification(allotment.id)}
+                    className="absolute top-3 right-3 p-1 rounded hover:bg-muted"
+                  >
+                    <X size={16} className="text-muted-foreground" />
+                  </button>
+
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-full bg-warning/20 flex items-center justify-center flex-shrink-0">
+                      <Bell className="text-warning" size={24} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-warning font-medium mb-1">🚨 NEW ASSIGNMENT</p>
+                      <h4 className="text-lg font-semibold text-foreground">{allotment.disasterTitle}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        You have been assigned to a disaster relief task
+                      </p>
+                      
+                      <div className="mt-3 p-3 rounded-lg bg-muted/50 space-y-2">
+                        <div className="flex items-center gap-2 text-sm">
+                          <MapPin size={14} className="text-success" />
+                          <span className="text-muted-foreground">Pickup:</span>
+                          <span className="font-medium text-foreground">{allotment.pickupLocation}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <MapPin size={14} className="text-destructive" />
+                          <span className="text-muted-foreground">Deliver to:</span>
+                          <span className="font-medium text-foreground">{allotment.destinationLocation}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {allotment.products.map((p, i) => (
+                          <span key={i} className="px-2 py-1 rounded bg-primary/20 text-primary text-xs">
+                            {p.name} × {p.quantity}
+                          </span>
+                        ))}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground mt-3">
+                        Assigned: {new Date(allotment.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <h3 className="text-xl font-semibold text-foreground mb-4">Your Assigned Tasks</h3>
 
@@ -40,6 +132,11 @@ const WorkerDashboard = () => {
                       <CheckCircle size={12} /> Approved
                     </span>
                   </div>
+                  {!viewedAllotments.includes(allotment.id) && (
+                    <span className="px-2 py-1 rounded-full bg-warning text-warning-foreground text-xs font-medium">
+                      NEW
+                    </span>
+                  )}
                 </div>
 
                 <div className="space-y-3 text-sm">
