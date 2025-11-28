@@ -1,12 +1,17 @@
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/store/authStore";
-import { Package, MapPin, Clock, CheckCircle, Bell, X } from "lucide-react";
+import { Package, MapPin, Clock, CheckCircle, Bell, X, Play, Navigation } from "lucide-react";
+import { toast } from "sonner";
 
 const WorkerDashboard = () => {
-  const { user, allotments } = useAuthStore();
+  const { user, allotments, startJourney } = useAuthStore();
   const [viewedAllotments, setViewedAllotments] = useState<string[]>(() => {
     const stored = localStorage.getItem(`viewed_${user?.phone}`);
+    return stored ? JSON.parse(stored) : [];
+  });
+  const [startedJourneys, setStartedJourneys] = useState<string[]>(() => {
+    const stored = localStorage.getItem(`journeys_${user?.phone}`);
     return stored ? JSON.parse(stored) : [];
   });
 
@@ -29,6 +34,20 @@ const WorkerDashboard = () => {
     const allIds = myAllotments.map(a => a.id);
     setViewedAllotments(allIds);
     localStorage.setItem(`viewed_${user?.phone}`, JSON.stringify(allIds));
+  };
+
+  const handleStartJourney = (allotmentId: string) => {
+    // Get user's location (simulated)
+    const lat = 22.5726 + (Math.random() - 0.5) * 0.1;
+    const lng = 88.3639 + (Math.random() - 0.5) * 0.1;
+    
+    startJourney(allotmentId, lat, lng);
+    
+    const updated = [...startedJourneys, allotmentId];
+    setStartedJourneys(updated);
+    localStorage.setItem(`journeys_${user?.phone}`, JSON.stringify(updated));
+    
+    toast.success('Journey started! Citizens can now track your location.');
   };
 
   return (
@@ -186,6 +205,24 @@ const WorkerDashboard = () => {
                       </span>
                     ))}
                   </div>
+                </div>
+
+                {/* Start Journey Button */}
+                <div className="mt-4">
+                  {startedJourneys.includes(allotment.id) || allotment.journeyStarted ? (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-success/20 text-success">
+                      <Navigation size={18} className="animate-pulse" />
+                      <span className="font-medium">Journey Active - Citizens can track you</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleStartJourney(allotment.id)}
+                      className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors"
+                    >
+                      <Play size={18} />
+                      Start Journey
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

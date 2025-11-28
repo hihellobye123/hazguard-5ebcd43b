@@ -2,15 +2,16 @@ import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import DisasterCard from "@/components/DisasterCard";
 import AllotmentModal from "@/components/AllotmentModal";
+import WorkersTable from "@/components/WorkersTable";
 import { useDisasters, Disaster } from "@/hooks/useDisasters";
 import { useAuthStore } from "@/store/authStore";
-import { RefreshCw, Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { RefreshCw, Clock, CheckCircle, XCircle, AlertTriangle, Users } from "lucide-react";
 
 const AdminDashboard = () => {
-  const { disasters, loading, lastUpdated, refetch } = useDisasters(300000); // 5 min refresh
+  const { disasters, loading, lastUpdated, refetch } = useDisasters(300000);
   const { allotments, updateAllotmentStatus } = useAuthStore();
   const [selectedDisaster, setSelectedDisaster] = useState<Disaster | null>(null);
-  const [activeTab, setActiveTab] = useState<'disasters' | 'allotments'>('disasters');
+  const [activeTab, setActiveTab] = useState<'disasters' | 'allotments' | 'workers'>('disasters');
 
   const pendingAllotments = allotments.filter(a => a.status === 'pending_main');
 
@@ -59,6 +60,15 @@ const AdminDashboard = () => {
                 {pendingAllotments.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab('workers')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              activeTab === 'workers' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            <Users size={16} />
+            Workers List
           </button>
         </div>
 
@@ -166,6 +176,8 @@ const AdminDashboard = () => {
             )}
           </div>
         )}
+
+        {activeTab === 'workers' && <WorkersTable />}
       </main>
 
       {selectedDisaster && (
