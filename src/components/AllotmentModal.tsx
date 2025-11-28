@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Disaster } from "@/hooks/useDisasters";
 import { workers } from "@/data/workers";
 import { useAuthStore } from "@/store/authStore";
-import { X, Plus, Trash2, Check } from "lucide-react";
+import { X, Plus, Trash2, Check, CheckCircle2, Send } from "lucide-react";
 import { toast } from "sonner";
 
 interface AllotmentModalProps {
@@ -26,7 +26,7 @@ const locationOptions = [
 ];
 
 const AllotmentModal = ({ disaster, onClose }: AllotmentModalProps) => {
-  const { user, addAllotment } = useAuthStore();
+  const { user, addAllotment, addCitizenNotification } = useAuthStore();
   const [selectedWorkers, setSelectedWorkers] = useState<typeof workers>([]);
   const [pickupLocation, setPickupLocation] = useState(locationOptions[0].name);
   const [destinationLocation, setDestinationLocation] = useState(disaster.location);
@@ -34,6 +34,7 @@ const AllotmentModal = ({ disaster, onClose }: AllotmentModalProps) => {
     { name: 'Relief Kit', quantity: 10, pricePerUnit: 500 }
   ]);
   const [frequency, setFrequency] = useState(1);
+  const [submitted, setSubmitted] = useState(false);
 
   const toggleWorker = (worker: typeof workers[0]) => {
     setSelectedWorkers(prev => 
@@ -69,6 +70,8 @@ const AllotmentModal = ({ disaster, onClose }: AllotmentModalProps) => {
       return;
     }
 
+    const allotmentId = crypto.randomUUID();
+
     addAllotment({
       disasterId: disaster.id,
       disasterTitle: disaster.title,
@@ -82,9 +85,58 @@ const AllotmentModal = ({ disaster, onClose }: AllotmentModalProps) => {
       createdBy: user?.name || 'Unknown'
     });
 
-    toast.success('Allotment created successfully!');
-    onClose();
+    // Add citizen notification for nearby citizens (5km radius)
+    addCitizenNotification({
+      message: `🚨 Help is on the way! ${selectedWorkers.length} relief worker(s) have been dispatched for ${disaster.title}`,
+      destination: destinationLocation,
+      allotmentId: allotmentId
+    });
+
+    setSubmitted(true);
+    toast.success('Allotment submitted successfully!');
+    
+    // Show success card for 3 seconds then close
+    setTimeout(() => {
+      onClose();
+    }, 3000);
   };
+
+  // Success Screen
+  if (submitted) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+        <div className="glass-card w-full max-w-md p-8 text-center animate-fade-in">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-success/20 flex items-center justify-center">
+            <CheckCircle2 size={48} className="text-success" />
+          </div>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Allotment Submitted!</h2>
+          <p className="text-muted-foreground mb-6">
+            {selectedWorkers.length} worker(s) have been notified for this relief operation.
+          </p>
+          
+          <div className="p-4 rounded-xl bg-muted/50 mb-4">
+            <p className="text-sm font-medium text-foreground mb-2">Workers Notified:</p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {selectedWorkers.map(w => (
+                <span key={w.phone} className="px-3 py-1 rounded-full bg-primary/20 text-primary text-sm">
+                  {w.name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 text-success">
+            <Send size={16} />
+            <span className="text-sm">Notifications sent to all selected workers</span>
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-4">
+            Citizens within 5km radius of {destinationLocation} will also be notified.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">

@@ -1,22 +1,14 @@
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { useAuthStore } from "@/store/authStore";
-import { MapPin, Phone, MessageCircle, Navigation, Users, AlertTriangle } from "lucide-react";
+import { MapPin, Phone, MessageCircle, Navigation, Users, AlertTriangle, Bell, X, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-
-// Simulated worker locations (in production, this would come from GPS tracking)
-const generateWorkerLocation = (destinationLat: number, destinationLng: number, radius: number) => {
-  // Generate random point within radius (in km)
-  const r = radius * Math.sqrt(Math.random());
-  const theta = Math.random() * 2 * Math.PI;
-  const lat = destinationLat + (r / 111) * Math.cos(theta);
-  const lng = destinationLng + (r / (111 * Math.cos(destinationLat * Math.PI / 180))) * Math.sin(theta);
-  return { lat, lng };
-};
+import ChatModal from "@/components/ChatModal";
+import LiveMapTracker from "@/components/LiveMapTracker";
 
 // Calculate distance between two points using Haversine formula
 const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-  const R = 6371; // Earth's radius in km
+  const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
   const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -26,7 +18,7 @@ const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   return R * c;
 };
 
-// West Bengal destination coordinates (simplified)
+// West Bengal destination coordinates
 const locationCoordinates: { [key: string]: { lat: number; lng: number } } = {
   "Kolkata Central": { lat: 22.5726, lng: 88.3639 },
   "Howrah Station": { lat: 22.5839, lng: 88.3422 },
@@ -44,59 +36,87 @@ interface TrackedWorker {
   lat: number;
   lng: number;
   destination: string;
+  destinationLat: number;
+  destinationLng: number;
   disasterTitle: string;
   status: 'en_route' | 'nearby' | 'arrived';
+  allotmentId: string;
+  journeyStarted: boolean;
 }
 
 const CitizenDashboard = () => {
-  const { user, allotments } = useAuthStore();
+  const { user, allotments, getCitizenNotifications, dismissCitizenNotification } = useAuthStore();
   const [trackedWorkers, setTrackedWorkers] = useState<TrackedWorker[]>([]);
   const [selectedLocation, setSelectedLocation] = useState("Kolkata Central");
-  const [searchRadius] = useState(10); // 10km radius
+  const [searchRadius] = useState(5); // 5km radius
+  const [chatWorker, setChatWorker] = useState<{ name: string; phone: string } | null>(null);
+  const [expandedMap, setExpandedMap] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  const notifications = getCitizenNotifications();
+
+  // Get user's simulated coordinates
+  const userCoords = locationCoordinates[selectedLocation] || locationCoordinates.default;
+
+  // Filter notifications for nearby destinations (within 5km)
+  const nearbyNotifications = notifications.filter(n => {
+    const destCoords = locationCoordinates[n.destination] || locationCoordinates.default;
+    const distance = calculateDistance(userCoords.lat, userCoords.lng, destCoords.lat, destCoords.lng);
+    return distance <= searchRadius;
+  });
 
   // Get approved allotments and simulate worker locations
   useEffect(() => {
-    const approvedAllotments = allotments.filter(a => a.status === 'approved');
-    
-    const workers: TrackedWorker[] = [];
-    
-    approvedAllotments.forEach(allotment => {
-      const destCoords = locationCoordinates[allotment.destinationLocation] || locationCoordinates.default;
-      const userCoords = locationCoordinates[selectedLocation] || locationCoordinates.default;
+    const updateWorkers = () => {
+      const approvedAllotments = allotments.filter(a => a.status === 'approved');
+      const workers: TrackedWorker[] = [];
       
-      allotment.workers.forEach(worker => {
-        // Simulate worker position (random position around destination, within 15km)
-        const workerPos = generateWorkerLocation(destCoords.lat, destCoords.lng, 15);
-        const distance = calculateDistance(userCoords.lat, userCoords.lng, workerPos.lat, workerPos.lng);
+      approvedAllotments.forEach(allotment => {
+        const destCoords = locationCoordinates[allotment.destinationLocation] || locationCoordinates.default;
         
-        if (distance <= searchRadius) {
-          workers.push({
-            name: worker.name,
-            phone: worker.phone,
-            distance: Math.round(distance * 10) / 10,
-            lat: workerPos.lat,
-            lng: workerPos.lng,
-            destination: allotment.destinationLocation,
-            disasterTitle: allotment.disasterTitle,
-            status: distance < 1 ? 'arrived' : distance < 5 ? 'nearby' : 'en_route',
-          });
-        }
+        allotment.workers.forEach(worker => {
+          // Use stored worker location or simulate
+          let workerLat = allotment.workerLat || destCoords.lat + (Math.random() - 0.5) * 0.1;
+          let workerLng = allotment.workerLng || destCoords.lng + (Math.random() - 0.5) * 0.1;
+          
+          const distance = calculateDistance(userCoords.lat, userCoords.lng, workerLat, workerLng);
+          
+          if (distance <= searchRadius) {
+            workers.push({
+              name: worker.name,
+              phone: worker.phone,
+              distance: Math.round(distance * 10) / 10,
+              lat: workerLat,
+              lng: workerLng,
+              destination: allotment.destinationLocation,
+              destinationLat: destCoords.lat,
+              destinationLng: destCoords.lng,
+              disasterTitle: allotment.disasterTitle,
+              status: distance < 1 ? 'arrived' : distance < 3 ? 'nearby' : 'en_route',
+              allotmentId: allotment.id,
+              journeyStarted: allotment.journeyStarted || false,
+            });
+          }
+        });
       });
-    });
 
-    // Sort by distance
-    workers.sort((a, b) => a.distance - b.distance);
-    setTrackedWorkers(workers);
-  }, [allotments, selectedLocation, searchRadius]);
+      workers.sort((a, b) => a.distance - b.distance);
+      setTrackedWorkers(workers);
+      setLastRefresh(new Date());
+    };
+
+    updateWorkers();
+    const interval = setInterval(updateWorkers, 20000); // Refresh every 20 seconds
+    return () => clearInterval(interval);
+  }, [allotments, selectedLocation, searchRadius, userCoords.lat, userCoords.lng]);
 
   const handleCall = (phone: string, name: string) => {
     window.location.href = `tel:${phone}`;
     toast.success(`Calling ${name}...`);
   };
 
-  const handleMessage = (phone: string, name: string) => {
-    window.location.href = `sms:${phone}`;
-    toast.success(`Opening message to ${name}...`);
+  const openChat = (name: string, phone: string) => {
+    setChatWorker({ name, phone });
   };
 
   const getStatusColor = (status: string) => {
@@ -122,8 +142,47 @@ const CitizenDashboard = () => {
       <main className="pt-24 px-4 max-w-4xl mx-auto">
         <div className="glass-card p-6 mb-6 animate-fade-in">
           <h2 className="text-2xl font-bold text-primary mb-2">Citizen Dashboard</h2>
-          <p className="text-muted-foreground">Track relief workers in your area</p>
+          <p className="text-muted-foreground">Track relief workers in your area (5km radius)</p>
         </div>
+
+        {/* Help Coming Notifications */}
+        {nearbyNotifications.length > 0 && (
+          <div className="mb-6 animate-fade-in">
+            <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Bell className="text-warning animate-pulse" size={20} />
+              Help is Coming! ({nearbyNotifications.length})
+            </h3>
+            <div className="space-y-3">
+              {nearbyNotifications.map(notification => (
+                <div 
+                  key={notification.id}
+                  className="relative glass-card p-4 border-2 border-success/50 bg-success/10"
+                >
+                  <button
+                    onClick={() => dismissCitizenNotification(notification.id)}
+                    className="absolute top-2 right-2 p-1 rounded hover:bg-muted"
+                  >
+                    <X size={16} className="text-muted-foreground" />
+                  </button>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
+                      <Bell className="text-success" size={20} />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{notification.message}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Destination: {notification.destination}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(notification.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Location Selector */}
         <div className="glass-card p-4 mb-6 animate-fade-in">
@@ -140,9 +199,15 @@ const CitizenDashboard = () => {
               <option key={location} value={location}>{location}</option>
             ))}
           </select>
-          <p className="text-xs text-muted-foreground mt-2">
-            Showing workers within {searchRadius}km radius
-          </p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-muted-foreground">
+              Showing workers within {searchRadius}km radius
+            </p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <RefreshCw size={12} />
+              Updated: {lastRefresh.toLocaleTimeString()}
+            </p>
+          </div>
         </div>
 
         {/* Workers List */}
@@ -162,9 +227,6 @@ const CitizenDashboard = () => {
             <h4 className="text-lg font-medium text-foreground mb-2">No Workers Nearby</h4>
             <p className="text-muted-foreground">
               No relief workers are currently within {searchRadius}km of your location.
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Try selecting a different location or check back later.
             </p>
           </div>
         ) : (
@@ -196,6 +258,32 @@ const CitizenDashboard = () => {
                   </div>
                 </div>
 
+                {/* Live Map Toggle */}
+                {worker.journeyStarted && (
+                  <div className="mb-4">
+                    <button
+                      onClick={() => setExpandedMap(expandedMap === worker.allotmentId ? null : worker.allotmentId)}
+                      className="w-full py-2 rounded-lg bg-muted/50 text-foreground text-sm flex items-center justify-center gap-2 hover:bg-muted transition-colors"
+                    >
+                      <MapPin size={16} />
+                      {expandedMap === worker.allotmentId ? 'Hide Live Map' : 'View Live Location'}
+                    </button>
+                    
+                    {expandedMap === worker.allotmentId && (
+                      <div className="mt-3">
+                        <LiveMapTracker
+                          workerName={worker.name}
+                          workerLat={worker.lat}
+                          workerLng={worker.lng}
+                          destinationLat={worker.destinationLat}
+                          destinationLng={worker.destinationLng}
+                          destination={worker.destination}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Distance Progress Bar */}
                 <div className="mb-4">
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -216,11 +304,11 @@ const CitizenDashboard = () => {
                     Call
                   </button>
                   <button
-                    onClick={() => handleMessage(worker.phone, worker.name)}
+                    onClick={() => openChat(worker.name, worker.phone)}
                     className="flex-1 py-3 rounded-xl bg-primary/20 text-primary font-medium flex items-center justify-center gap-2 hover:bg-primary/30 transition-colors"
                   >
                     <MessageCircle size={18} />
-                    Message
+                    Chat
                   </button>
                 </div>
               </div>
@@ -233,12 +321,21 @@ const CitizenDashboard = () => {
           <h4 className="text-lg font-semibold text-foreground mb-3">Need Help?</h4>
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>• Workers shown are part of active disaster relief operations</p>
-            <p>• Distance is calculated from your selected location</p>
-            <p>• You can directly call or message workers for assistance</p>
-            <p>• Location updates automatically every few minutes</p>
+            <p>• Live maps refresh every 20 seconds when journey is active</p>
+            <p>• You can call or chat with workers directly</p>
+            <p>• You'll receive notifications when help is dispatched to your area</p>
           </div>
         </div>
       </main>
+
+      {/* Chat Modal */}
+      {chatWorker && (
+        <ChatModal
+          workerName={chatWorker.name}
+          workerPhone={chatWorker.phone}
+          onClose={() => setChatWorker(null)}
+        />
+      )}
     </div>
   );
 };
