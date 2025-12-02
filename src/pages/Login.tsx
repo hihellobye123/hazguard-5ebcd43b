@@ -135,9 +135,11 @@ const Login = () => {
         {loginType === 'staff' && (
           <div className="mt-6 p-4 rounded-xl bg-muted/30 text-sm text-muted-foreground">
             <p className="font-medium text-foreground mb-2">Demo Credentials:</p>
-            <p>• Admin: admin / admin</p>
-            <p>• Local Admin: localadmin / localadmin</p>
-            <p>• Worker: [Name] / [Phone from list]</p>
+            <p>• Admin: <span className="text-foreground font-mono">admin</span> / <span className="text-foreground font-mono">admin</span></p>
+            <p>• Local Admin: <span className="text-foreground font-mono">localadmin</span> / <span className="text-foreground font-mono">localadmin</span></p>
+            <p>• Workers:</p>
+            <p className="ml-2">- <span className="text-foreground font-mono">Amit Das</span> / <span className="text-foreground font-mono">9876543210</span></p>
+            <p className="ml-2">- <span className="text-foreground font-mono">Raju Mondal</span> / <span className="text-foreground font-mono">9876543211</span></p>
           </div>
         )}
 
