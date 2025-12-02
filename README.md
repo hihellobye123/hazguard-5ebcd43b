@@ -40,10 +40,12 @@ HazGuard is a modern web application designed to streamline disaster relief oper
 - Cost calculation and approval workflow
 
 ### 📍 Citizen Tracking Portal
-- View relief workers within 10km radius
-- Real-time distance calculation
-- Direct call/message functionality
-- Location-based filtering
+- View relief workers within 5km radius
+- **Live Google Maps tracking** (refreshes every 20 seconds)
+- Real-time distance calculation with progress bar
+- Direct **call** and **chat** functionality
+- "Help is Coming" notifications when workers dispatched
+- Location-based filtering for nearby areas
 
 ### 🎨 Modern UI/UX
 - Liquid glass (glassmorphism) design
@@ -108,13 +110,16 @@ npm run build
 1. Login with name and phone number
 2. Receive notification cards for new assignments
 3. View task details (pickup, destination, products)
-4. Contact team members if needed
+4. **Start Journey** to enable citizen live tracking
+5. Contact team members if needed
 
 ### Citizen Workflow
 1. Login via citizen portal with name/phone
-2. Select your location
-3. View nearby relief workers (10km radius)
-4. Call or message workers directly
+2. Select your location from dropdown
+3. Receive "Help is Coming" notifications for nearby dispatches
+4. View nearby relief workers (5km radius)
+5. **Track worker location live** on Google Maps (when journey started)
+6. **Call** or **chat** with workers directly
 
 ## 🏗️ Tech Stack
 

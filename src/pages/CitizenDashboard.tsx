@@ -18,12 +18,22 @@ const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   return R * c;
 };
 
-// West Bengal destination coordinates
+// West Bengal destination coordinates (matching AllotmentModal locations)
 const locationCoordinates: { [key: string]: { lat: number; lng: number } } = {
   "Kolkata Central": { lat: 22.5726, lng: 88.3639 },
   "Howrah Station": { lat: 22.5839, lng: 88.3422 },
+  "Howrah": { lat: 22.5839, lng: 88.3422 },
   "Salt Lake": { lat: 22.5800, lng: 88.4200 },
   "Andul": { lat: 22.5600, lng: 88.1200 },
+  "Andul Station": { lat: 22.5600, lng: 88.1200 },
+  "Sealdah Station": { lat: 22.5645, lng: 88.3700 },
+  "Kolkata": { lat: 22.5726, lng: 88.3639 },
+  "Bandel Junction": { lat: 22.9300, lng: 88.3900 },
+  "Hooghly": { lat: 22.9000, lng: 88.4000 },
+  "Chinsurah Depot": { lat: 22.8700, lng: 88.3900 },
+  "Chinsurah": { lat: 22.8700, lng: 88.3900 },
+  "Diamond Harbour": { lat: 22.1900, lng: 88.1900 },
+  "South 24 Parganas": { lat: 22.1600, lng: 88.4300 },
   "Durgapur": { lat: 23.5200, lng: 87.3100 },
   "Siliguri": { lat: 26.7271, lng: 88.3953 },
   "default": { lat: 22.5726, lng: 88.3639 },
