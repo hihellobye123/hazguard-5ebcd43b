@@ -72,6 +72,9 @@ const AllotmentModal = ({ disaster, onClose }: AllotmentModalProps) => {
 
     const allotmentId = crypto.randomUUID();
 
+    // Admin creates = directly approved, Local admin = needs main admin approval
+    const status = user?.role === 'admin' ? 'approved' : 'pending_main';
+
     addAllotment({
       disasterId: disaster.id,
       disasterTitle: disaster.title,
@@ -81,7 +84,7 @@ const AllotmentModal = ({ disaster, onClose }: AllotmentModalProps) => {
       destinationLocation,
       products,
       totalCost,
-      status: user?.role === 'admin' ? 'pending_local' : 'pending_main',
+      status,
       createdBy: user?.name || 'Unknown'
     });
 
