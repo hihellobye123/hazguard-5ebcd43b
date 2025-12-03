@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Citizen Dashboard - HazGuard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">HazGuard</div>
+    <div class="navbar-user">
+      <span id="userInfo"></span>
+      <button class="btn-logout" onclick="HazGuard.logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="glass-card animate-fade-in" style="margin-bottom: 1.5rem;">
+      <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--primary); margin-bottom: 0.25rem;">Citizen Dashboard</h2>
+      <p style="color: var(--muted-foreground);">Track relief workers in your area (5km radius)</p>
+    </div>
+
+    <!-- Help Coming Notifications -->
+    <div id="helpNotifications"></div>
+
+    <!-- Location Selector -->
+    <div class="glass-card location-selector">
+      <label>📍 Your Location</label>
+      <select class="glass-select" id="locationSelect" onchange="updateLocation()" style="margin-top: 0.5rem;">
+        <option value="Kolkata Central">Kolkata Central</option>
+        <option value="Howrah Station">Howrah Station</option>
+        <option value="Salt Lake">Salt Lake</option>
+        <option value="Andul">Andul</option>
+        <option value="Sealdah Station">Sealdah Station</option>
+        <option value="Bandel Junction">Bandel Junction</option>
+        <option value="Hooghly">Hooghly</option>
+        <option value="Chinsurah">Chinsurah</option>
+        <option value="Diamond Harbour">Diamond Harbour</option>
+        <option value="South 24 Parganas">South 24 Parganas</option>
+        <option value="Durgapur">Durgapur</option>
+        <option value="Siliguri">Siliguri</option>
+      </select>
+      <div class="location-info">
+        <span>Showing workers within 5km radius</span>
+        <span>🔄 Updated: <span id="lastRefresh"></span></span>
+      </div>
+    </div>
+
+    <!-- Workers List -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+        👥 Relief Workers Nearby
+      </h3>
+      <span style="font-size: 0.875rem; color: var(--muted-foreground);" id="workersCount">0 found</span>
+    </div>
+    <div id="workersList"></div>
+
+    <!-- Help Info -->
+    <div class="glass-card help-info">
+      <h4>Need Help?</h4>
+      <ul>
+        <li>• Workers shown are part of active disaster relief operations</li>
+        <li>• Live maps refresh every 20 seconds when journey is active</li>
+        <li>• You can call or chat with workers directly</li>
+        <li>• You'll receive notifications when help is dispatched to your area</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Chat Modal -->
+  <div class="modal-overlay" id="chatModal">
+    <div class="modal chat-modal" id="chatContent"></div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+  <script>
+    // Check auth
+    if (!HazGuard.checkAuth(['citizen'])) {
+      window.location.href = 'index.html';
+    }
+
+    const user = HazGuard.state.user;
+    document.getElementById('userInfo').textContent = `${user.name} (Citizen)`;
+
+    let selectedLocation = 'Kolkata Central';
+    let expandedMapWorker = null;
+    let chatWorker = null;
+
+    renderDashboard();
+    setInterval(renderDashboard, 20000); // Refresh every 20 seconds
+
+    function updateLocation() {
+      selectedLocation = document.getElementById('locationSelect').value;
+      renderDashboard();
+    }
+
+    function renderDashboard() {
+      document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString();
+      
+      const userCoords = HazGuard.locationCoordinates[selectedLocation] || HazGuard.locationCoordinates.default;
+      const searchRadius = 5;
+
+      // Notifications
+      const notifications = HazGuard.state.citizenNotifications.filter(n => !n.dismissed);
+      const nearbyNotifications = notifications.filter(n => {
+        const destCoords = HazGuard.locationCoordinates[n.destination] || HazGuard.locationCoordinates.default;
+        const distance = HazGuard.calculateDistance(userCoords.lat, userCoords.lng, destCoords.lat, destCoords.lng);
+        return distance <= searchRadius;
+      });
+
+      const notificationsContainer = document.getElementById('helpNotifications');
+      if (nearbyNotifications.length > 0) {
+        notificationsContainer.innerHTML = `
+          <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+            🔔 Help is Coming! (${nearbyNotifications.length})
+          </h3>
+          ${nearbyNotifications.map(n => `
+            <div class="help-notification" style="position: relative;">
+              <button class="btn-dismiss" onclick="dismissHelpNotification('${n.id}')">×</button>
+              <div style="display: flex; gap: 0.75rem;">
+                <div class="help-icon">🔔</div>
+                <div>
+                  <p style="font-weight: 500;">${n.message}</p>
+                  <p style="font-size: 0.875rem; color: var(--muted-foreground); margin-top: 0.25rem;">Destination: ${n.destination}</p>
+                  <p style="font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.25rem;">${HazGuard.formatDate(n.createdAt)}</p>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        `;
+      } else {
+        notificationsContainer.innerHTML = '';
+      }
+
+      // Workers
+      const approvedAllotments = HazGuard.state.allotments.filter(a => a.status === 'approved');
+      const trackedWorkers = [];
+
+      approvedAllotments.forEach(allotment => {
+        const destCoords = HazGuard.locationCoordinates[allotment.destinationLocation] || HazGuard.locationCoordinates.default;
+        
+        allotment.workers.forEach(worker => {
+          let workerLat = allotment.workerLat || destCoords.lat + (Math.random() - 0.5) * 0.1;
+          let workerLng = allotment.workerLng || destCoords.lng + (Math.random() - 0.5) * 0.1;
+          
+          const distance = HazGuard.calculateDistance(userCoords.lat, userCoords.lng, workerLat, workerLng);
+          
+          if (distance <= searchRadius) {
+            trackedWorkers.push({
+              name: worker.name,
+              phone: worker.phone,
+              distance: Math.round(distance * 10) / 10,
+              lat: workerLat,
+              lng: workerLng,
+              destination: allotment.destinationLocation,
+              destinationLat: destCoords.lat,
+              destinationLng: destCoords.lng,
+              disasterTitle: allotment.disasterTitle,
+              status: distance < 1 ? 'arrived' : distance < 3 ? 'nearby' : 'en_route',
+              allotmentId: allotment.id,
+              journeyStarted: allotment.journeyStarted || false,
+            });
+          }
+        });
+      });
+
+      trackedWorkers.sort((a, b) => a.distance - b.distance);
+
+      document.getElementById('workersCount').textContent = `${trackedWorkers.length} found`;
+
+      const workersList = document.getElementById('workersList');
+      if (trackedWorkers.length === 0) {
+        workersList.innerHTML = `
+          <div class="glass-card empty-state animate-fade-in">
+            <div class="empty-icon">⚠️</div>
+            <h4 class="empty-title">No Workers Nearby</h4>
+            <p class="empty-text">No relief workers are currently within ${searchRadius}km of your location.</p>
+          </div>
+        `;
+      } else {
+        workersList.innerHTML = trackedWorkers.map((worker, index) => {
+          const statusColors = {
+            arrived: 'badge-success',
+            nearby: 'badge-warning',
+            en_route: ''
+          };
+          const statusText = {
+            arrived: 'Arrived',
+            nearby: 'Nearby',
+            en_route: 'En Route'
+          };
+          const statusBg = {
+            arrived: 'hsla(160, 84%, 39%, 0.2)',
+            nearby: 'hsla(45, 93%, 47%, 0.2)',
+            en_route: 'hsla(174, 72%, 56%, 0.2)'
+          };
+          const statusColor = {
+            arrived: 'var(--success)',
+            nearby: 'var(--warning)',
+            en_route: 'var(--primary)'
+          };
+
+          const progressWidth = Math.max(10, 100 - (worker.distance / searchRadius) * 100);
+
+          return `
+            <div class="glass-card worker-card animate-fade-in" style="animation-delay: ${index * 0.1}s;">
+              <div class="worker-card-header">
+                <div>
+                  <h4 class="worker-card-name">${worker.name}</h4>
+                  <p class="worker-card-task">${worker.disasterTitle}</p>
+                </div>
+                <span class="badge" style="background: ${statusBg[worker.status]}; color: ${statusColor[worker.status]};">
+                  ${statusText[worker.status]}
+                </span>
+              </div>
+
+              <div class="worker-card-info">
+                <span style="display: flex; align-items: center; gap: 0.5rem;">
+                  📍 <strong>${worker.distance} km away</strong>
+                </span>
+                <span style="display: flex; align-items: center; gap: 0.5rem; color: var(--muted-foreground);">
+                  → ${worker.destination}
+                </span>
+              </div>
+
+              ${worker.journeyStarted ? `
+                <button class="btn-view-map" onclick="toggleMap('${worker.allotmentId}')">
+                  📍 ${expandedMapWorker === worker.allotmentId ? 'Hide Live Map' : 'View Live Location'}
+                </button>
+                
+                ${expandedMapWorker === worker.allotmentId ? `
+                  <div class="map-container">
+                    <iframe 
+                      src="https://maps.google.com/maps?q=${worker.lat},${worker.lng}&z=15&output=embed"
+                      allowfullscreen
+                      loading="lazy">
+                    </iframe>
+                    <p style="font-size: 0.75rem; color: var(--muted-foreground); text-align: center; margin-top: 0.5rem;">
+                      Tracking ${worker.name} • Refreshes every 20 seconds
+                    </p>
+                  </div>
+                ` : ''}
+              ` : ''}
+
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${progressWidth}%;"></div>
+              </div>
+
+              <div class="contact-buttons">
+                <button class="btn-call" onclick="callWorker('${worker.phone}', '${worker.name}')">
+                  📞 Call
+                </button>
+                <button class="btn-chat" onclick="openChat('${worker.name}', '${worker.phone}')">
+                  💬 Chat
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    function dismissHelpNotification(id) {
+      HazGuard.dismissNotification(id);
+      renderDashboard();
+    }
+
+    function toggleMap(allotmentId) {
+      expandedMapWorker = expandedMapWorker === allotmentId ? null : allotmentId;
+      renderDashboard();
+    }
+
+    function callWorker(phone, name) {
+      window.location.href = `tel:${phone}`;
+      HazGuard.showToast(`Calling ${name}...`, 'success');
+    }
+
+    function openChat(name, phone) {
+      chatWorker = { name, phone };
+      renderChatModal();
+      document.getElementById('chatModal').classList.add('active');
+    }
+
+    function closeChat() {
+      document.getElementById('chatModal').classList.remove('active');
+      chatWorker = null;
+    }
+
+    function renderChatModal() {
+      const chatKey = `chat_${user.phone}_${chatWorker.phone}`;
+      const messages = HazGuard.getMessages(chatKey);
+      
+      document.getElementById('chatContent').innerHTML = `
+        <div class="modal-header" style="margin-bottom: 0;">
+          <div class="chat-header">
+            <div class="chat-avatar">${chatWorker.name.charAt(0)}</div>
+            <div>
+              <h3 style="font-weight: 600;">${chatWorker.name}</h3>
+              <p style="font-size: 0.875rem; color: var(--success);">Relief Worker</p>
+            </div>
+          </div>
+          <button class="btn-close" onclick="closeChat()">×</button>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+          ${messages.length === 0 ? `
+            <div style="text-align: center; color: var(--muted-foreground); padding: 2rem;">
+              <p>No messages yet</p>
+              <p style="font-size: 0.875rem;">Send a message to start the conversation</p>
+            </div>
+          ` : messages.map(m => `
+            <div class="message ${m.sender === 'user' ? 'sent' : 'received'}">
+              <p>${m.text}</p>
+              <p class="message-time">${new Date(m.timestamp).toLocaleTimeString()}</p>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="chat-input-container">
+          <input type="text" class="chat-input" id="chatInput" placeholder="Type a message..." onkeypress="handleChatKeypress(event)">
+          <button class="btn-send" onclick="sendMessage()">➤</button>
+        </div>
+      `;
+
+      // Scroll to bottom
+      setTimeout(() => {
+        const messagesDiv = document.getElementById('chatMessages');
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }, 100);
+    }
+
+    function handleChatKeypress(e) {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      
+      if (!text) return;
+
+      const chatKey = `chat_${user.phone}_${chatWorker.phone}`;
+      HazGuard.addMessage(chatKey, { text, sender: 'user' });
+      
+      // Simulate worker response
+      setTimeout(() => {
+        const responses = [
+          "Thank you for reaching out! I'm on my way.",
+          "Got it! ETA is approximately 15 minutes.",
+          "We have the supplies ready. Stay safe!",
+          "Understood. Will be there shortly."
+        ];
+        HazGuard.addMessage(chatKey, { 
+          text: responses[Math.floor(Math.random() * responses.length)], 
+          sender: 'worker' 
+        });
+        renderChatModal();
+      }, 1000);
+
+      input.value = '';
+      renderChatModal();
+    }
+  </script>
+</body>
+</html>

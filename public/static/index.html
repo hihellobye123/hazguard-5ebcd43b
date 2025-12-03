@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HazGuard - Disaster Relief Management System</title>
+  <meta name="description" content="HazGuard is a disaster relief management system for coordinating workers and resources during natural disasters in West Bengal.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.25rem; position: relative;">
+    <div class="glass-card animate-fade-in" style="width: 100%; max-width: 400px; padding: 2rem;">
+      <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="font-size: 2rem; font-weight: 700; color: var(--primary); margin-bottom: 0.5rem;">HazGuard</h1>
+        <p style="color: var(--muted-foreground);">Disaster Relief Management System</p>
+      </div>
+
+      <!-- Login Type Toggle -->
+      <div class="login-toggle">
+        <button id="staffToggle" class="active" onclick="setLoginType('staff')">Staff Login</button>
+        <button id="citizenToggle" onclick="setLoginType('citizen')">Citizen Login</button>
+      </div>
+
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div style="margin-bottom: 1.5rem;">
+          <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem;" id="usernameLabel">Username</label>
+          <input type="text" id="username" class="glass-input" placeholder="Enter username" required>
+        </div>
+
+        <div style="margin-bottom: 1.5rem;">
+          <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem;" id="passwordLabel">Password / Phone</label>
+          <input type="password" id="password" class="glass-input" placeholder="Enter password or phone number" required>
+        </div>
+
+        <button type="submit" class="glass-button" id="loginBtn">Login</button>
+      </form>
+
+      <!-- Staff Credentials -->
+      <div class="credentials-box" id="staffCredentials">
+        <p class="title">Demo Credentials:</p>
+        <p>• Admin: <code>admin</code> / <code>admin</code></p>
+        <p>• Local Admin: <code>localadmin</code> / <code>localadmin</code></p>
+        <p>• Workers:</p>
+        <p style="margin-left: 0.5rem;">- <code>Amit Das</code> / <code>9876543210</code></p>
+        <p style="margin-left: 0.5rem;">- <code>Raju Mondal</code> / <code>9876543211</code></p>
+      </div>
+
+      <!-- Citizen Info -->
+      <div class="credentials-box" id="citizenInfo" style="display: none;">
+        <p class="title">Citizen Access:</p>
+        <p>Enter your name and phone to track nearby relief workers and get emergency assistance.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+  <script>
+    let loginType = 'staff';
+
+    function setLoginType(type) {
+      loginType = type;
+      document.getElementById('staffToggle').classList.toggle('active', type === 'staff');
+      document.getElementById('citizenToggle').classList.toggle('active', type === 'citizen');
+      document.getElementById('staffCredentials').style.display = type === 'staff' ? 'block' : 'none';
+      document.getElementById('citizenInfo').style.display = type === 'citizen' ? 'block' : 'none';
+      
+      const usernameLabel = document.getElementById('usernameLabel');
+      const passwordLabel = document.getElementById('passwordLabel');
+      const username = document.getElementById('username');
+      const password = document.getElementById('password');
+      const loginBtn = document.getElementById('loginBtn');
+
+      if (type === 'citizen') {
+        usernameLabel.textContent = 'Your Name';
+        passwordLabel.textContent = 'Phone Number';
+        username.placeholder = 'Enter your name';
+        password.placeholder = 'Enter your phone number';
+        password.type = 'tel';
+        loginBtn.textContent = 'Track Relief Workers';
+      } else {
+        usernameLabel.textContent = 'Username';
+        passwordLabel.textContent = 'Password / Phone';
+        username.placeholder = 'Enter username';
+        password.placeholder = 'Enter password or phone number';
+        password.type = 'password';
+        loginBtn.textContent = 'Login';
+      }
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      HazGuard.login(username, password, loginType);
+    }
+
+    // Check if already logged in
+    HazGuard.loadState();
+    if (HazGuard.state.user) {
+      const role = HazGuard.state.user.role;
+      if (role === 'admin') window.location.href = 'admin.html';
+      else if (role === 'local_admin') window.location.href = 'local-admin.html';
+      else if (role === 'worker') window.location.href = 'worker.html';
+      else if (role === 'citizen') window.location.href = 'citizen.html';
+    }
+  </script>
+</body>
+</html>

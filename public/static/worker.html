@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worker Dashboard - HazGuard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">HazGuard</div>
+    <div class="navbar-user">
+      <span id="userInfo"></span>
+      <button class="btn-logout" onclick="HazGuard.logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Welcome Card -->
+    <div class="glass-card welcome-card animate-fade-in">
+      <h2 class="welcome-title">Welcome, <span id="workerName"></span>!</h2>
+      <p class="welcome-phone">Phone: <span id="workerPhone"></span></p>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notifications"></div>
+
+    <!-- Tasks Section -->
+    <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem;">Your Assigned Tasks</h3>
+    <div id="tasksList"></div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+  <script>
+    // Check auth
+    if (!HazGuard.checkAuth(['worker'])) {
+      window.location.href = 'index.html';
+    }
+
+    const user = HazGuard.state.user;
+    document.getElementById('userInfo').textContent = `${user.name} (Worker)`;
+    document.getElementById('workerName').textContent = user.name;
+    document.getElementById('workerPhone').textContent = user.phone;
+
+    // Get viewed allotments from localStorage
+    let viewedAllotments = JSON.parse(localStorage.getItem(`viewed_${user.phone}`) || '[]');
+    let startedJourneys = JSON.parse(localStorage.getItem(`journeys_${user.phone}`) || '[]');
+
+    renderDashboard();
+
+    function renderDashboard() {
+      const allotments = HazGuard.state.allotments;
+      
+      // Get allotments assigned to this worker
+      const myAllotments = allotments.filter(a => 
+        a.workers.some(w => w.name.toLowerCase() === user.name.toLowerCase()) &&
+        a.status === 'approved'
+      );
+
+      // New notifications
+      const newNotifications = myAllotments.filter(a => !viewedAllotments.includes(a.id));
+
+      // Render notifications
+      const notificationsContainer = document.getElementById('notifications');
+      if (newNotifications.length > 0) {
+        notificationsContainer.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h3 style="font-size: 1.125rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+              🔔 New Assignments (${newNotifications.length})
+            </h3>
+            <button onclick="dismissAll()" style="background: none; border: none; color: var(--muted-foreground); cursor: pointer; font-size: 0.875rem;">
+              Mark all as read
+            </button>
+          </div>
+          ${newNotifications.map(a => `
+            <div class="notification-banner" style="position: relative;">
+              <button class="btn-dismiss" onclick="dismissNotification('${a.id}')">×</button>
+              <div class="notification-header">
+                <div class="notification-icon">🔔</div>
+                <div class="notification-content">
+                  <p class="notification-label">🚨 NEW ASSIGNMENT</p>
+                  <h4 class="notification-title">${a.disasterTitle}</h4>
+                  <p class="notification-text">You have been assigned to a disaster relief task</p>
+                  
+                  <div style="background: var(--muted); border-radius: 0.5rem; padding: 0.75rem; margin-top: 0.75rem;">
+                    <p style="font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                      <span style="color: var(--success);">📍</span>
+                      <span style="color: var(--muted-foreground);">Pickup:</span>
+                      <span style="font-weight: 500;">${a.pickupLocation}</span>
+                    </p>
+                    <p style="font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                      <span style="color: var(--destructive);">📍</span>
+                      <span style="color: var(--muted-foreground);">Deliver to:</span>
+                      <span style="font-weight: 500;">${a.destinationLocation}</span>
+                    </p>
+                  </div>
+
+                  <div style="margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                    ${a.products.map(p => `<span style="background: hsla(174, 72%, 56%, 0.2); color: var(--primary); padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;">${p.name} × ${p.quantity}</span>`).join('')}
+                  </div>
+
+                  <p style="font-size: 0.75rem; color: var(--muted-foreground); margin-top: 0.75rem;">
+                    Assigned: ${HazGuard.formatDate(a.createdAt)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        `;
+      } else {
+        notificationsContainer.innerHTML = '';
+      }
+
+      // Render tasks
+      const tasksList = document.getElementById('tasksList');
+      if (myAllotments.length === 0) {
+        tasksList.innerHTML = `
+          <div class="glass-card empty-state animate-fade-in">
+            <div class="empty-icon">📦</div>
+            <h4 class="empty-title">No Tasks Assigned</h4>
+            <p class="empty-text">You don't have any active assignments at the moment.</p>
+          </div>
+        `;
+      } else {
+        tasksList.innerHTML = myAllotments.map(a => {
+          const journeyStarted = startedJourneys.includes(a.id) || a.journeyStarted;
+          const isNew = !viewedAllotments.includes(a.id);
+          
+          return `
+            <div class="glass-card task-card animate-fade-in">
+              <div class="task-header">
+                <div>
+                  <h4 class="task-title">${a.disasterTitle}</h4>
+                  <span class="badge badge-success">✓ Approved</span>
+                </div>
+                ${isNew ? '<span class="badge badge-new">NEW</span>' : ''}
+              </div>
+
+              <div class="task-info">
+                <div class="task-info-item">
+                  <span class="icon">📍</span>
+                  <span class="label">Pickup:</span>
+                  <span class="value">${a.pickupLocation}</span>
+                </div>
+                <div class="task-info-item">
+                  <span class="icon" style="color: var(--destructive);">📍</span>
+                  <span class="label">Destination:</span>
+                  <span class="value">${a.destinationLocation}</span>
+                </div>
+                <div class="task-info-item">
+                  <span class="icon" style="color: var(--warning);">🕐</span>
+                  <span class="label">Assigned:</span>
+                  <span class="value">${new Date(a.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              <div class="items-box">
+                <p class="items-box-title">Items to Deliver:</p>
+                <div class="items-list">
+                  ${a.products.map(p => `<p>• ${p.name}: ${p.quantity} units</p>`).join('')}
+                </div>
+              </div>
+
+              <div class="team-section">
+                <p class="team-title">Team Members:</p>
+                <div class="team-tags">
+                  ${a.workers.map(w => `
+                    <span class="team-tag ${w.name.toLowerCase() === user.name.toLowerCase() ? 'current' : ''}">
+                      ${w.name} ${w.name.toLowerCase() === user.name.toLowerCase() ? '(You)' : ''}
+                    </span>
+                  `).join('')}
+                </div>
+              </div>
+
+              ${journeyStarted ? `
+                <div class="journey-active">
+                  <span style="animation: blink 1s infinite;">📍</span>
+                  Journey Active - Citizens can track you
+                </div>
+              ` : `
+                <button class="btn-start-journey" onclick="startJourney('${a.id}')">
+                  ▶ Start Journey
+                </button>
+              `}
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    function dismissNotification(id) {
+      viewedAllotments.push(id);
+      localStorage.setItem(`viewed_${user.phone}`, JSON.stringify(viewedAllotments));
+      renderDashboard();
+    }
+
+    function dismissAll() {
+      const myAllotments = HazGuard.state.allotments.filter(a => 
+        a.workers.some(w => w.name.toLowerCase() === user.name.toLowerCase()) &&
+        a.status === 'approved'
+      );
+      viewedAllotments = myAllotments.map(a => a.id);
+      localStorage.setItem(`viewed_${user.phone}`, JSON.stringify(viewedAllotments));
+      renderDashboard();
+    }
+
+    function startJourney(allotmentId) {
+      HazGuard.startJourney(allotmentId);
+      startedJourneys.push(allotmentId);
+      localStorage.setItem(`journeys_${user.phone}`, JSON.stringify(startedJourneys));
+      HazGuard.showToast('Journey started! Citizens can now track your location.', 'success');
+      renderDashboard();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - HazGuard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">HazGuard</div>
+    <div class="navbar-user">
+      <span id="userInfo"></span>
+      <button class="btn-logout" onclick="HazGuard.logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+      <h2 class="page-title" style="margin-bottom: 0;">Main Admin Dashboard</h2>
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <span style="font-size: 0.875rem; color: var(--muted-foreground);">🕐 Last updated: <span id="lastUpdated"></span></span>
+        <button onclick="refreshDisasters()" style="padding: 0.5rem 1rem; border-radius: 0.5rem; background: hsla(174, 72%, 56%, 0.2); color: var(--primary); border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+          🔄 Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tabDisasters" onclick="showTab('disasters')">Live Disasters</button>
+      <button class="tab-btn" id="tabAllotments" onclick="showTab('allotments')">
+        Pending Approvals <span class="tab-badge" id="pendingCount" style="display: none;">0</span>
+      </button>
+      <button class="tab-btn" id="tabWorkers" onclick="showTab('workers')">👥 Workers List</button>
+    </div>
+
+    <!-- Disasters Tab -->
+    <div id="disastersContent">
+      <div id="disastersGrid" class="cards-grid"></div>
+    </div>
+
+    <!-- Allotments Tab -->
+    <div id="allotmentsContent" style="display: none;"></div>
+
+    <!-- Workers Tab -->
+    <div id="workersContent" style="display: none;">
+      <div class="glass-card">
+        <h3 style="margin-bottom: 1rem;">All Workers ({workers.length})</h3>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Phone Number</th>
+              </tr>
+            </thead>
+            <tbody id="workersTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Allotment Modal -->
+  <div class="modal-overlay" id="allotmentModal">
+    <div class="modal" id="modalContent"></div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+  <script>
+    let disasters = [];
+    let selectedDisaster = null;
+    let selectedWorkers = [];
+    let products = [{ name: 'Relief Kit', quantity: 10, pricePerUnit: 500 }];
+
+    // Check auth
+    if (!HazGuard.checkAuth(['admin'])) {
+      window.location.href = 'index.html';
+    }
+
+    // Initialize
+    document.getElementById('userInfo').textContent = `${HazGuard.state.user.name} (Admin)`;
+    refreshDisasters();
+    renderWorkersTable();
+    updatePendingCount();
+
+    function refreshDisasters() {
+      disasters = HazGuard.generateDisasters();
+      document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+      renderDisasters();
+    }
+
+    function renderDisasters() {
+      const grid = document.getElementById('disastersGrid');
+      if (disasters.length === 0) {
+        grid.innerHTML = `
+          <div class="glass-card empty-state" style="grid-column: 1 / -1;">
+            <div class="empty-icon">✅</div>
+            <h4 class="empty-title">No Active Disasters</h4>
+            <p class="empty-text">There are no natural disasters currently reported in West Bengal.</p>
+          </div>
+        `;
+      } else {
+        grid.innerHTML = disasters.map(d => HazGuard.renderDisasterCard(d, true)).join('');
+      }
+    }
+
+    function showTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
+      
+      document.getElementById('disastersContent').style.display = tab === 'disasters' ? 'block' : 'none';
+      document.getElementById('allotmentsContent').style.display = tab === 'allotments' ? 'block' : 'none';
+      document.getElementById('workersContent').style.display = tab === 'workers' ? 'block' : 'none';
+
+      if (tab === 'allotments') renderPendingAllotments();
+    }
+
+    function updatePendingCount() {
+      const pending = HazGuard.state.allotments.filter(a => a.status === 'pending_main');
+      const badge = document.getElementById('pendingCount');
+      if (pending.length > 0) {
+        badge.textContent = pending.length;
+        badge.style.display = 'inline';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    function renderPendingAllotments() {
+      const container = document.getElementById('allotmentsContent');
+      const pending = HazGuard.state.allotments.filter(a => a.status === 'pending_main');
+
+      if (pending.length === 0) {
+        container.innerHTML = `
+          <div class="glass-card empty-state">
+            <div class="empty-icon">✅</div>
+            <h4 class="empty-title">All Caught Up!</h4>
+            <p class="empty-text">No pending allotments waiting for approval.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = pending.map(a => `
+        <div class="glass-card animate-fade-in" style="margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+            <div>
+              <h3 style="font-size: 1.125rem; font-weight: 600;">${a.disasterTitle}</h3>
+              <p style="font-size: 0.875rem; color: var(--muted-foreground);">Created by: ${a.createdBy}</p>
+            </div>
+            <span class="badge badge-warning">Pending Approval</span>
+          </div>
+
+          <div class="form-grid" style="margin-bottom: 1rem; font-size: 0.875rem;">
+            <div>
+              <p style="color: var(--muted-foreground);">Pickup:</p>
+              <p style="font-weight: 500;">${a.pickupLocation}</p>
+            </div>
+            <div>
+              <p style="color: var(--muted-foreground);">Destination:</p>
+              <p style="font-weight: 500;">${a.destinationLocation}</p>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <p style="color: var(--muted-foreground); font-size: 0.875rem; margin-bottom: 0.5rem;">Workers Assigned:</p>
+            <div class="team-tags">
+              ${a.workers.map(w => `<span class="team-tag">${w.name} (${w.phone})</span>`).join('')}
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <p style="color: var(--muted-foreground); font-size: 0.875rem; margin-bottom: 0.5rem;">Products:</p>
+            ${a.products.map(p => `<p style="font-size: 0.875rem;">${p.name}: ${p.quantity} × ₹${p.pricePerUnit} = ₹${p.quantity * p.pricePerUnit}</p>`).join('')}
+          </div>
+
+          <div class="total-cost" style="margin-bottom: 1rem;">
+            <span class="label">Total:</span>
+            <span class="amount">₹${a.totalCost.toLocaleString()}</span>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem;">
+            <button onclick="approveAllotment('${a.id}')" style="flex: 1; padding: 0.75rem; border-radius: 0.5rem; background: var(--success); color: white; border: none; font-weight: 600; cursor: pointer;">
+              ✓ Approve
+            </button>
+            <button onclick="rejectAllotment('${a.id}')" style="flex: 1; padding: 0.75rem; border-radius: 0.5rem; background: var(--destructive); color: white; border: none; font-weight: 600; cursor: pointer;">
+              ✗ Reject
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function approveAllotment(id) {
+      HazGuard.updateAllotmentStatus(id, 'approved');
+      HazGuard.showToast('Allotment approved!', 'success');
+      renderPendingAllotments();
+      updatePendingCount();
+    }
+
+    function rejectAllotment(id) {
+      HazGuard.updateAllotmentStatus(id, 'rejected');
+      HazGuard.showToast('Allotment rejected', 'error');
+      renderPendingAllotments();
+      updatePendingCount();
+    }
+
+    function renderWorkersTable() {
+      const tbody = document.getElementById('workersTable');
+      tbody.innerHTML = HazGuard.workers.map((w, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${w.name}</td>
+          <td>${w.phone}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Allotment Modal Functions
+    function openAllotmentModal(disasterId) {
+      selectedDisaster = disasters.find(d => d.id === disasterId);
+      selectedWorkers = [];
+      products = [{ name: 'Relief Kit', quantity: 10, pricePerUnit: 500 }];
+      renderAllotmentModal();
+      document.getElementById('allotmentModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('allotmentModal').classList.remove('active');
+    }
+
+    function renderAllotmentModal() {
+      const modal = document.getElementById('modalContent');
+      modal.innerHTML = `
+        <div class="modal-header">
+          <h2 class="modal-title">Allot Help</h2>
+          <button class="btn-close" onclick="closeModal()">×</button>
+        </div>
+
+        <div style="background: var(--muted); border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.5rem;">
+          <h3 style="font-weight: 600;">${selectedDisaster.title}</h3>
+          <p style="font-size: 0.875rem; color: var(--muted-foreground);">${selectedDisaster.location} • ${selectedDisaster.affectedArea}</p>
+        </div>
+
+        <div class="modal-section">
+          <h3>Select Workers (<span id="selectedCount">0</span> selected)</h3>
+          <div class="workers-list">
+            ${HazGuard.workers.map(w => `
+              <div class="worker-item ${selectedWorkers.find(sw => sw.phone === w.phone) ? 'selected' : ''}" 
+                   onclick="toggleWorker('${w.phone}')">
+                <div>
+                  <p class="worker-name">${w.name}</p>
+                  <p class="worker-phone">${w.phone}</p>
+                </div>
+                ${selectedWorkers.find(sw => sw.phone === w.phone) ? '<span class="check-icon">✓</span>' : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="form-grid modal-section">
+          <div>
+            <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem;">Pickup Location</label>
+            <select class="glass-select" id="pickupLocation">
+              ${HazGuard.locationOptions.map(loc => `<option value="${loc.name}">${loc.name} (${loc.area})</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem;">Destination Location</label>
+            <input type="text" class="glass-input" id="destinationLocation" value="${selectedDisaster.location}" style="border-radius: 0.5rem;">
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h3>Products / Supplies</h3>
+            <button class="btn-add-product" onclick="addProduct()">+ Add Item</button>
+          </div>
+          <div class="products-list" id="productsList">
+            ${products.map((p, i) => renderProductRow(p, i)).join('')}
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem;">Delivery Frequency (trips)</label>
+          <input type="number" class="glass-input" id="frequency" value="1" min="1" style="width: 120px; border-radius: 0.5rem;">
+        </div>
+
+        <div class="total-cost" style="margin-bottom: 1.5rem;">
+          <span class="label">Total Estimated Cost:</span>
+          <span class="amount" id="totalCost">₹${calculateTotal().toLocaleString()}</span>
+        </div>
+
+        <button class="glass-button" onclick="submitAllotment()">Submit Allotment</button>
+      `;
+    }
+
+    function renderProductRow(product, index) {
+      return `
+        <div class="product-row">
+          <input type="text" class="product-name" placeholder="Item name" value="${product.name}" 
+                 onchange="updateProduct(${index}, 'name', this.value)">
+          <input type="number" class="product-qty" placeholder="Qty" value="${product.quantity}" 
+                 onchange="updateProduct(${index}, 'quantity', parseInt(this.value) || 0)">
+          <input type="number" class="product-price" placeholder="Price/unit" value="${product.pricePerUnit}" 
+                 onchange="updateProduct(${index}, 'pricePerUnit', parseInt(this.value) || 0)">
+          <button class="btn-remove" onclick="removeProduct(${index})">🗑</button>
+        </div>
+      `;
+    }
+
+    function toggleWorker(phone) {
+      const worker = HazGuard.workers.find(w => w.phone === phone);
+      const index = selectedWorkers.findIndex(w => w.phone === phone);
+      if (index === -1) {
+        selectedWorkers.push(worker);
+      } else {
+        selectedWorkers.splice(index, 1);
+      }
+      renderAllotmentModal();
+    }
+
+    function addProduct() {
+      products.push({ name: '', quantity: 1, pricePerUnit: 0 });
+      renderAllotmentModal();
+    }
+
+    function removeProduct(index) {
+      products.splice(index, 1);
+      renderAllotmentModal();
+    }
+
+    function updateProduct(index, field, value) {
+      products[index][field] = value;
+      document.getElementById('totalCost').textContent = `₹${calculateTotal().toLocaleString()}`;
+    }
+
+    function calculateTotal() {
+      const frequency = parseInt(document.getElementById('frequency')?.value) || 1;
+      return products.reduce((sum, p) => sum + (p.quantity * p.pricePerUnit), 0) * frequency;
+    }
+
+    function submitAllotment() {
+      if (selectedWorkers.length === 0) {
+        HazGuard.showToast('Please select at least one worker', 'error');
+        return;
+      }
+      if (products.some(p => !p.name || p.quantity <= 0)) {
+        HazGuard.showToast('Please fill all product details', 'error');
+        return;
+      }
+
+      const pickup = document.getElementById('pickupLocation').value;
+      const destination = document.getElementById('destinationLocation').value;
+      const frequency = parseInt(document.getElementById('frequency').value) || 1;
+      const totalCost = calculateTotal();
+
+      // Admin creates = directly approved
+      HazGuard.addAllotment({
+        disasterId: selectedDisaster.id,
+        disasterTitle: selectedDisaster.title,
+        location: selectedDisaster.location,
+        workers: selectedWorkers.map(w => ({ name: w.name, phone: w.phone })),
+        pickupLocation: pickup,
+        destinationLocation: destination,
+        products: products,
+        totalCost: totalCost,
+        status: 'approved',
+        createdBy: HazGuard.state.user.name
+      });
+
+      // Add citizen notification
+      HazGuard.addCitizenNotification({
+        message: `🚨 Help is on the way! ${selectedWorkers.length} relief worker(s) have been dispatched for ${selectedDisaster.title}`,
+        destination: destination,
+        allotmentId: crypto.randomUUID()
+      });
+
+      // Show success
+      document.getElementById('modalContent').innerHTML = `
+        <div class="success-card">
+          <div class="success-icon">✓</div>
+          <h2 class="success-title">Allotment Submitted!</h2>
+          <p class="success-message">${selectedWorkers.length} worker(s) have been notified for this relief operation.</p>
+          
+          <div class="workers-notified">
+            <p class="workers-notified-title">Workers Notified:</p>
+            <div class="workers-tags">
+              ${selectedWorkers.map(w => `<span class="worker-tag">${w.name}</span>`).join('')}
+            </div>
+          </div>
+
+          <p style="color: var(--success); font-size: 0.875rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+            ✉️ Notifications sent to all selected workers
+          </p>
+          <p style="color: var(--muted-foreground); font-size: 0.75rem; margin-top: 1rem;">
+            Citizens within 5km radius of ${destination} will also be notified.
+          </p>
+        </div>
+      `;
+
+      setTimeout(() => {
+        closeModal();
+        updatePendingCount();
+      }, 3000);
+    }
+
+    // Auto-refresh every 5 minutes
+    setInterval(refreshDisasters, 300000);
+  </script>
+</body>
+</html>
