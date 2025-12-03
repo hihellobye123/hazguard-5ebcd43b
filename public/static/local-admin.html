@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Admin Dashboard - HazGuard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">HazGuard</div>
+    <div class="navbar-user">
+      <span id="userInfo"></span>
+      <button class="btn-logout" onclick="HazGuard.logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h2 class="page-title">Local Admin Dashboard</h2>
+
+    <!-- Pending Allotments from Main Admin -->
+    <section style="margin-bottom: 2rem;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        ⚠️ Pending Allotments (Assigned by Main Admin)
+      </h3>
+      <div id="pendingLocal"></div>
+    </section>
+
+    <!-- Submitted to Main Admin -->
+    <section style="margin-bottom: 2rem;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        🕐 Awaiting Main Admin Approval (<span id="pendingMainCount">0</span>)
+      </h3>
+      <div id="pendingMain" class="cards-grid"></div>
+    </section>
+
+    <!-- Approved -->
+    <section>
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        ✅ Approved Allotments (<span id="approvedCount">0</span>)
+      </h3>
+      <div id="approved" class="cards-grid"></div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+  <script>
+    // Check auth
+    if (!HazGuard.checkAuth(['local_admin'])) {
+      window.location.href = 'index.html';
+    }
+
+    document.getElementById('userInfo').textContent = `${HazGuard.state.user.name} (Local Admin)`;
+    renderDashboard();
+
+    function renderDashboard() {
+      const allotments = HazGuard.state.allotments;
+      const pendingLocal = allotments.filter(a => a.status === 'pending_local');
+      const pendingMain = allotments.filter(a => a.status === 'pending_main');
+      const approved = allotments.filter(a => a.status === 'approved');
+
+      // Update counts
+      document.getElementById('pendingMainCount').textContent = pendingMain.length;
+      document.getElementById('approvedCount').textContent = approved.length;
+
+      // Pending Local
+      const pendingLocalContainer = document.getElementById('pendingLocal');
+      if (pendingLocal.length === 0) {
+        pendingLocalContainer.innerHTML = `
+          <div class="glass-card empty-state">
+            <div class="empty-icon">🕐</div>
+            <p class="empty-text">No pending allotments from Main Admin</p>
+          </div>
+        `;
+      } else {
+        pendingLocalContainer.innerHTML = pendingLocal.map(a => `
+          <div class="glass-card animate-fade-in" style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+              <div>
+                <h4 style="font-size: 1.125rem; font-weight: 600;">${a.disasterTitle}</h4>
+                <p style="font-size: 0.875rem; color: var(--muted-foreground);">${a.location}</p>
+              </div>
+              <span class="badge badge-warning">Action Required</span>
+            </div>
+
+            <div class="form-grid" style="margin-bottom: 1rem; font-size: 0.875rem;">
+              <div>
+                <p style="color: var(--muted-foreground);">Pickup:</p>
+                <p style="font-weight: 500;">${a.pickupLocation}</p>
+              </div>
+              <div>
+                <p style="color: var(--muted-foreground);">Destination:</p>
+                <p style="font-weight: 500;">${a.destinationLocation}</p>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <p style="color: var(--muted-foreground); font-size: 0.875rem; margin-bottom: 0.5rem;">Workers:</p>
+              <div class="team-tags">
+                ${a.workers.map(w => `<span class="team-tag">${w.name} • ${w.phone}</span>`).join('')}
+              </div>
+            </div>
+
+            <div style="background: var(--muted); border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1rem;">
+              <p style="color: var(--muted-foreground); font-size: 0.875rem; margin-bottom: 0.5rem;">Products:</p>
+              ${a.products.map(p => `<p style="font-size: 0.875rem;">${p.name}: ${p.quantity} units × ₹${p.pricePerUnit}/unit</p>`).join('')}
+            </div>
+
+            <div class="total-cost" style="margin-bottom: 1rem;">
+              <span class="label">Total Cost:</span>
+              <span class="amount">₹${a.totalCost.toLocaleString()}</span>
+            </div>
+
+            <button onclick="submitToMainAdmin('${a.id}')" class="glass-button">
+              Confirm & Submit to Main Admin
+            </button>
+          </div>
+        `).join('');
+      }
+
+      // Pending Main
+      const pendingMainContainer = document.getElementById('pendingMain');
+      if (pendingMain.length === 0) {
+        pendingMainContainer.innerHTML = `<p style="color: var(--muted-foreground); font-size: 0.875rem;">No pending submissions</p>`;
+      } else {
+        pendingMainContainer.innerHTML = pendingMain.map(a => `
+          <div class="glass-card">
+            <h4 style="font-weight: 500;">${a.disasterTitle}</h4>
+            <p style="font-size: 0.875rem; color: var(--muted-foreground);">${a.workers.length} workers • ₹${a.totalCost.toLocaleString()}</p>
+            <span class="badge badge-warning" style="margin-top: 0.5rem; display: inline-block;">Pending Approval</span>
+          </div>
+        `).join('');
+      }
+
+      // Approved
+      const approvedContainer = document.getElementById('approved');
+      if (approved.length === 0) {
+        approvedContainer.innerHTML = `<p style="color: var(--muted-foreground); font-size: 0.875rem;">No approved allotments yet</p>`;
+      } else {
+        approvedContainer.innerHTML = approved.map(a => `
+          <div class="glass-card" style="border: 1px solid hsla(160, 84%, 39%, 0.3);">
+            <h4 style="font-weight: 500;">${a.disasterTitle}</h4>
+            <p style="font-size: 0.875rem; color: var(--muted-foreground);">${a.workers.length} workers • ₹${a.totalCost.toLocaleString()}</p>
+            <span class="badge badge-success" style="margin-top: 0.5rem; display: inline-block;">Approved ✓</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    function submitToMainAdmin(id) {
+      HazGuard.updateAllotmentStatus(id, 'pending_main');
+      HazGuard.showToast('Submitted to Main Admin for approval', 'success');
+      renderDashboard();
+    }
+  </script>
+</body>
+</html>
